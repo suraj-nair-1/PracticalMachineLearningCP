@@ -1,0 +1,95 @@
+---
+title: "Predicting Exercise Class using Stochastic Gradient Boosting"
+author: "Suraj Nair"
+date: "September 24, 2015"
+output: html_document
+---
+
+# Synopsis
+
+In this report we will aim to build a predictive model which predicts type of exercise given a input from several sensors on a wearable exercise device, while documenting all of the steps along the way. We will look at the necessary data manipulation, cross validation, initial model, and testing results. Ultimately, we will conclude that using Stochastic Gradient Boosting, we can get the best results on both the validation set and test set.
+
+# Data Manipulation 
+
+We begin by reading in the data and loading the appropriate libraries.
+
+```{r, cache=TRUE, warning=FALSE, message=FALSE}
+library(plyr)
+library(dplyr)
+library(caret)
+
+train <- read.csv("pml-training.csv")
+test <- read.csv("pml-testing.csv")
+```
+
+```{r, cache=TRUE, warning=FALSE, message=FALSE, echo=FALSE}
+totalRows = nrow(train)
+yesRows = nrow(train[train$new_window == "yes", ])
+```
+
+Unfortunately, much of the initial data is not helpful in classifying the type of exercise. Specifically, close to 100 of the 159 potential predictors only have vaues when the new_window field is "yes", which is a field that rarely occurs. Specifically, out of the `r totalRows` instances, only `r yesRows` meet this criteria. Thus, we can ignore the columns that only exist for data where the new window field is yes, significantly decreasing the size of our dataset and making the data more relevant to what we want to predict. The following code does this data manipulation.
+
+
+```{r, cache=TRUE, warning=FALSE, message=FALSE}
+train <- train[, c(2:10 ,36:48, 59:67, 83:85, 101, 112:123, 139, 150:160)]
+train <- mutate(train, var_yaw_forearm = NULL)
+train <- mutate(train, amplitude_yaw_forearm = NULL)
+train <- mutate(train, amplitude_yaw_dumbell = NULL)
+train <- mutate(train, var_yaw_dumbell = NULL)
+train <- mutate(train, var_yaw_dumbbell = NULL)
+train <- mutate(train, amplitude_yaw_dumbbell = NULL)
+train <- mutate(train, var_yaw_arm = NULL)
+train <- mutate(train, amplitude_yaw_arm = NULL)
+train <- mutate(train, var_yaw_belt = NULL)
+
+test <- test[, c(2:10 ,36:48, 59:67, 83:85, 101, 112:123, 139, 150:159)]
+test <- mutate(test, var_yaw_forearm = NULL)
+test <- mutate(test, amplitude_yaw_forearm = NULL)
+test <- mutate(test, amplitude_yaw_dumbell = NULL)
+test <- mutate(test, var_yaw_dumbell = NULL)
+test <- mutate(test, var_yaw_dumbbell = NULL)
+test <- mutate(test, amplitude_yaw_dumbbell = NULL)
+test <- mutate(test, var_yaw_arm = NULL)
+test <- mutate(test, amplitude_yaw_arm = NULL)
+test <- mutate(test, var_yaw_belt = NULL)
+```
+
+# Cross Validation & Model Building
+
+Before we begin building the model, we want to select a subset of the training set for cross validation, so we can get an idea of how the model will perform against out of sample data. We do this by randomly selecting 15000 rows from the train data to be the training set, and leaving the remanining ~3500 rows for cross validation. Since the rows are randomly selected, the cross validation should contain a roughly realistic distribution of the different classes, so hopefully it will provide an accurate representation of the test set and real samples. The following code divides the data into the train and validation sets.
+
+```{r, cache=TRUE, warning=FALSE, message=FALSE}
+inTrain <- sample(nrow(train), 15000)
+train <- train[inTrain,]
+validate <- train[-inTrain,]
+```
+
+Now we want to build the actual model. Because we have so many potential predictors, many could possibly be irrelevant, while others are very important for classification. To adjust for the variable importance of our predictors, we will use a boosting model that is able to adapt to such a distribution of predictors. The below code trains the model and tests the accuracy with the validation set. Since the model refines the weights of certain variables of iterations, we expect it to have a low out of sample error.
+
+
+gbm <- train(classe~., data = train, method = "gbm")
+
+ 
+```{r, cache=TRUE, warning=FALSE, message=FALSE, echo=FALSE, results='hide'}
+gbm <- train(classe~., data = train, method = "gbm")
+```
+
+```{r, cache=TRUE, warning=FALSE, message=FALSE}
+predictions <- predict(gbm, validate)
+cross_validation <- data.frame(predictions, validate$classe)
+percent_correct = nrow(cross_validation[cross_validation$predictions == cross_validation$validate.classe,]) /nrow(cross_validation)
+print(percent_correct)
+
+```
+
+When we check our out of sample error for the validation set, we get that we predicted the validate set with 99.8 percent accuracy. Like we expected, the model has very small error even for out of sample sets, due to the accuracy and adaptability of Stochastic Gradient Boosting. The only downside associated with this model is that it takes upwards of 30 minutes to train.  
+
+# Testing and Conclusions
+
+This same model predicted the test set with 100% accuracy, so we can confirm that it works well for out of sample sets. In conclusion, good data manipulation, combined with a boosting model that accounts for the large number of variable predictors ultimately created an accurate model.
+
+
+
+
+
+
